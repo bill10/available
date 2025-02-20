@@ -164,38 +164,13 @@ async def get_available_times_async(calendly_link, start_date, end_date):
                                     print(f"Failed to click {selector}: {str(e)}")
                                     continue
                                 
-                            # Verify popup is gone
-                            try:
-                                await page.wait_for_function("""
-                                    () => {
-                                        const selectors = [
-                                            '#onetrust-banner-sdk',
-                                            '#onetrust-consent-sdk',
-                                            'div[role="dialog"]',
-                                            '[aria-label*="cookie"]',
-                                            '[aria-label*="privacy"]'
-                                        ];
-                                        return !selectors.some(s => {
-                                            const el = document.querySelector(s);
-                                            return el && window.getComputedStyle(el).display !== 'none';
-                                        });
-                                    }
-                                """, timeout=5000)
-                                print("Privacy popup(s) confirmed gone")
-                            except Exception as e:
-                                print(f"Warning: Could not confirm popup removal: {str(e)}")
-                                
                             # Take screenshot after privacy handling
                             # await page.screenshot(path='after_privacy.png')
-                            
-                            # Wait for any animations and network activity to complete
-                            await page.wait_for_load_state('networkidle')
-                            await page.wait_for_timeout(2000)
 
                         # Save the HTML for debugging
-                        html_content = await page.content()
-                        with open('calendar_page.html', 'w', encoding='utf-8') as f:
-                            f.write(html_content)
+                        # html_content = await page.content()
+                        # with open('calendar_page.html', 'w', encoding='utf-8') as f:
+                        #     f.write(html_content)
                             
                         # Take screenshot of calendar state
                         # await page.screenshot(path='calendar_state.png')
