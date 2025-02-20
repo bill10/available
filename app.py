@@ -17,107 +17,6 @@ def parse_calendly_url(url):
         return None
     return parts[1]
 
-async def get_available_times_for_date(page, date):
-    try:
-        # Try to click the specific date
-        date_str = date.strftime('%Y-%m-%d')
-        print(f"Checking availability for date: {date_str}")
-        
-        # First check if the date button exists
-        date_button = await page.query_selector(f'button[data-date="{date_str}"]')
-        if not date_button:
-            print(f"No date button found for {date_str}")
-            return []
-        
-        # Click the date and wait for update
-        await date_button.click()
-        await page.wait_for_timeout(2000)
-        await page.wait_for_load_state('networkidle')
-        
-        # Get time slots
-        time_slots = await page.evaluate("""
-            () => {
-                const slots = [];
-                // Look for time slot buttons in the time picker dialog
-                const buttons = Array.from(document.querySelectorAll('button[role="radio"]'));
-                console.log('Found ' + buttons.length + ' potential time slot buttons');
-                
-                buttons.forEach(button => {
-                    // Get the time text
-                    const timeText = button.textContent.trim();
-                    if (!timeText) return;
-                    
-                    // Check if it's a valid time (contains am/pm)
-                    if (timeText.toLowerCase().includes('am') || timeText.toLowerCase().includes('pm')) {
-                        console.log('Found time slot:', timeText);
-                        slots.push({
-                            timestamp: timeText,
-                            disabled: button.hasAttribute('disabled') || button.getAttribute('aria-disabled') === 'true',
-                            attributes: {
-                                role: button.getAttribute('role'),
-                                'aria-label': button.getAttribute('aria-label')
-                            }
-                        });
-                    }
-                });
-                
-                console.log('Found ' + slots.length + ' valid time slots');
-                return slots;
-            }
-        """)
-        
-        print(f"Found {len(time_slots)} time slots for {date_str}")
-        
-        # Process the time slots
-        available_times = []
-        if not time_slots:
-            print("No time slots returned from page.evaluate")
-            return []
-            
-        print(f"Processing {len(time_slots)} time slots")
-        for slot in time_slots:
-            try:
-                if not isinstance(slot, dict):
-                    print(f"Invalid slot format, expected dict but got {type(slot)}: {slot}")
-                    continue
-                    
-                if 'timestamp' not in slot:
-                    print(f"No timestamp in slot: {slot}")
-                    continue
-                    
-                time_str = slot['timestamp']
-                if not time_str:
-                    print("Empty timestamp in slot")
-                    continue
-                    
-                if not isinstance(time_str, str):
-                    print(f"Invalid timestamp type, expected str but got {type(time_str)}: {time_str}")
-                    continue
-                    
-                if not ('am' in time_str.lower() or 'pm' in time_str.lower()):
-                    print(f"Invalid time format (no am/pm): {time_str}")
-                    continue
-                    
-                # Combine date and time
-                full_time_str = f"{date.strftime('%Y-%m-%d')} {time_str}"
-                print(f"Parsing datetime: {full_time_str}")
-                dt = datetime.strptime(full_time_str, '%Y-%m-%d %I:%M%p')
-                
-                # Convert to UTC
-                utc_offset = timedelta(hours=8)  # Pacific Time is UTC-8
-                dt = dt + utc_offset
-                
-                available_times.append(dt.isoformat() + 'Z')
-                print(f"Added time slot: {time_str} -> {dt.isoformat()}Z")
-            except (ValueError, TypeError, AttributeError) as e:
-                print(f"Error processing time slot {slot}: {str(e)}")
-                continue
-        
-        return available_times
-    except Exception as e:
-        print(f"Error getting times for {date_str}: {str(e)}")
-        return []
-
 async def get_available_times_async(calendly_link, start_date, end_date):
     try:
         print(f"Getting availability for {calendly_link} from {start_date} to {end_date}")
@@ -146,8 +45,6 @@ async def get_available_times_async(calendly_link, start_date, end_date):
                 current_date = start_date
                 
                 while current_date <= end_date:
-                    print(f"\nProcessing date: {current_date.strftime('%Y-%m-%d')}")
-                    
                     # Construct URL for this specific date
                     month_url = f"https://calendly.com/{organization}/{event_type_slug}?month={current_date.strftime('%Y-%m')}&timezone=America/Los_Angeles"
                     print(f"Loading calendar for month: {month_url}")
@@ -248,7 +145,7 @@ async def get_available_times_async(calendly_link, start_date, end_date):
                             # Try each selector with proper error handling
                             for selector in button_selectors:
                                 try:
-                                    print(f"Trying to click button with selector: {selector}")
+                                    # print(f"Trying to click button with selector: {selector}")
                                     # First check if the element exists and is visible
                                     button_visible = await page.evaluate(f"""
                                         () => {{
@@ -296,9 +193,9 @@ async def get_available_times_async(calendly_link, start_date, end_date):
                             await page.wait_for_timeout(2000)
 
                         # Save the HTML for debugging
-                        # html_content = await page.content()
-                        # with open('calendar_page.html', 'w', encoding='utf-8') as f:
-                        #     f.write(html_content)
+                        html_content = await page.content()
+                        with open('calendar_page.html', 'w', encoding='utf-8') as f:
+                            f.write(html_content)
                             
                         # Take screenshot of calendar state
                         # await page.screenshot(path='calendar_state.png')
@@ -418,8 +315,6 @@ async def get_available_times_async(calendly_link, start_date, end_date):
                                 # Wait for any updates after clicking
                                 await page.wait_for_timeout(2000)
                                 await page.wait_for_load_state('networkidle')
-                                    
-                                print(f"Found available date button for {current_date.strftime('%Y-%m-%d')}")
         
                                 print("Starting time slot detection...")
                                 
