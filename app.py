@@ -42,6 +42,7 @@ async def get_available_times_async(calendly_link, start_date, end_date):
             try:
                 # Get all dates between start and end date
                 available_times = []
+                duration = None
                 current_date = start_date
                 
                 while current_date <= end_date:
@@ -174,6 +175,45 @@ async def get_available_times_async(calendly_link, start_date, end_date):
                             
                         # Take screenshot of calendar state
                         # await page.screenshot(path='calendar_state.png')
+
+                        # Extract duration if we haven't yet
+                        if duration is None:
+                            duration_result = await page.evaluate("""
+                                () => {
+                                    // Find the clock icon by its SVG path
+                                    const svgs = Array.from(document.querySelectorAll('svg'));
+                                    for (const svg of svgs) {
+                                        // Check if this SVG has the clock path
+                                        const hasClockPaths = Array.from(svg.querySelectorAll('path')).some(path => 
+                                            path.getAttribute('d').includes('M.5 5a4.5 4.5')
+                                        );
+                                        
+                                        if (hasClockPaths) {
+                                            // Get the container with the duration text
+                                            const container = svg.closest('div');
+                                            if (!container) continue;
+                                            
+                                            const parentDiv = container.parentElement;
+                                            const text = parentDiv ? parentDiv.textContent.trim() : container.textContent.trim();
+                                            
+                                            const match = text.match(/(\d+)\s*(min|minute|hour)/i);
+                                            if (match) {
+                                                const value = parseInt(match[1]);
+                                                return {
+                                                    value: value,
+                                                    unit: 'minutes'
+                                                };
+                                            }
+                                        }
+                                    }
+                                    return null;
+                                }
+                            """)
+                            if duration_result:
+                                duration = duration_result
+                                print(f"Found duration: {duration}")
+                            else:
+                                print("Duration not found")
                         
                         # Get available dates and find next available
                         calendar_result = await page.evaluate('''
@@ -320,8 +360,7 @@ async def get_available_times_async(calendly_link, start_date, end_date):
                                                     
                                                     if (!isDisabled) {
                                                         slots.push({
-                                                            time: timeText,
-                                                            disabled: isDisabled
+                                                            time: timeText
                                                         });
                                                     }
                                                 }
@@ -419,7 +458,10 @@ async def get_available_times_async(calendly_link, start_date, end_date):
                 available_times.sort()
                 print(f"\nTotal available times found: {len(available_times)}")
                 await browser.close()
-                return {"available_times": available_times}
+                return {
+                    "available_times": available_times,
+                    "duration": duration
+                }
                 
             except Exception as e:
                 print(f"Error in browser session: {str(e)}")
