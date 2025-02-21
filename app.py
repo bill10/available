@@ -15,7 +15,13 @@ def parse_calendly_url(url):
     parts = url.strip('/').split('calendly.com/')
     if len(parts) != 2:
         return None
-    return parts[1]
+    path = parts[1]
+    
+    # Handle both direct links (d/xyz-abc) and traditional links (username/event)
+    if path.startswith('d/'):
+        return path  # Return the full path for direct links
+    else:
+        return path  # Return as is for traditional links
 
 async def get_available_times_async(calendly_link, start_date, end_date):
     try:
@@ -25,13 +31,6 @@ async def get_available_times_async(calendly_link, start_date, end_date):
         event_path = parse_calendly_url(calendly_link)
         if not event_path:
             return []  # Return empty list instead of error dict
-        
-        parts = event_path.split('/')
-        if len(parts) != 2:
-            return []  # Return empty list for invalid format
-            
-        organization, event_type_slug = parts
-        print(f"Organization: {organization}, Event type: {event_type_slug}")
         
         async with async_playwright() as p:
             # Launch browser with specific viewport size
@@ -47,7 +46,7 @@ async def get_available_times_async(calendly_link, start_date, end_date):
                 
                 while current_date <= end_date:
                     # Construct URL for this specific date
-                    month_url = f"https://calendly.com/{organization}/{event_type_slug}?month={current_date.strftime('%Y-%m')}&timezone=America/Los_Angeles"
+                    month_url = f"https://calendly.com/{event_path}?month={current_date.strftime('%Y-%m')}&timezone=America/Los_Angeles"
                     print(f"Loading calendar for month: {month_url}")
                     
                     # Load the page and wait for network to be idle
